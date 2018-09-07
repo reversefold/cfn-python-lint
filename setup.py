@@ -48,6 +48,7 @@ setup(
     packages=find_packages('src'),
     zip_safe=False,
     install_requires=['pyyaml', 'six', 'requests', 'aws-sam-translator>=1.6.0'],
+    scripts=['scripts/cfn-lint-multi.py'],
     entry_points={
         'console_scripts': [
             'cfn-lint = cfnlint.__main__:main'

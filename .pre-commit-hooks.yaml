@@ -5,7 +5,6 @@
 
 - id: cfn-lint
   name: cfn-lint
-  language: system
+  language: python
   files: .*\.cfn\.(json|yaml)
-  entry: /bin/bash
-  args: ['-c', 'echo $@ | xargs -n1 cfn-lint']
+  entry: cfn-lint-multi.py
