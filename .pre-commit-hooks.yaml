@@ -3,9 +3,9 @@
 # For use with pre-commit.
 # See usage instructions at https://pre-commit.com
 
--   id: cfn-lint
-    name: cfn-lint
-    language: system
-    files: .*\.cfn\.(json|yaml)
-    entry: /bin/bash
-    args: ['-c', 'echo $@ | xargs -n1 cfn-lint']
+- id: cfn-lint
+  name: cfn-lint
+  language: system
+  files: .*\.cfn\.(json|yaml)
+  entry: /bin/bash
+  args: ['-c', 'echo $@ | xargs -n1 cfn-lint']
