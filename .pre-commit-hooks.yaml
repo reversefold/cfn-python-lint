@@ -7,4 +7,4 @@
   name: cfn-lint
   language: python
   files: .*\.cfn\.(json|yaml)
-  entry: cfn-lint-multi.py
+  entry: cfn-lint-multi
