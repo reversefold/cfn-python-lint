@@ -32,7 +32,7 @@ class FunctionMemorySize(CloudFormationLintRule):
 
     def check_value(self, value, path):
         """ Check memory size value """
-        matches = list()
+        matches = []
 
         message = 'You must specify a value that is greater than or equal to {0}, ' \
                   'and it must be a multiple of 64. You cannot specify a size ' \
@@ -45,17 +45,17 @@ class FunctionMemorySize(CloudFormationLintRule):
                 matches.append(
                     RuleMatch(
                         path, message.format(
-                            self.min_memory, self.max_memory, ('/'.join(path)))))
+                            self.min_memory, self.max_memory, ('/'.join(map(str, path))))))
             elif value % 64 != 0:
                 matches.append(
                     RuleMatch(
                         path, message.format(
-                            self.min_memory, self.max_memory, ('/'.join(path)))))
+                            self.min_memory, self.max_memory, ('/'.join(map(str, path))))))
         except ValueError:
             matches.append(
                 RuleMatch(
                     path, message.format(
-                        self.min_memory, self.max_memory, ('/'.join(path)))))
+                        self.min_memory, self.max_memory, ('/'.join(map(str, path))))))
 
         return matches
 
@@ -69,10 +69,10 @@ class FunctionMemorySize(CloudFormationLintRule):
     def check_ref(self, value, path, parameters, resources):
         """ Check Memory Size Ref """
 
-        matches = list()
+        matches = []
         if value in resources:
             message = 'MemorySize can\'t use a Ref to a resource for {0}'
-            matches.append(RuleMatch(path, message.format(('/'.join(path)))))
+            matches.append(RuleMatch(path, message.format(('/'.join(map(str, path))))))
         elif value in parameters:
             parameter = parameters.get(value, {})
             param_type = parameter.get('Type', '')
@@ -126,7 +126,7 @@ class FunctionMemorySize(CloudFormationLintRule):
     def match(self, cfn):
         """Check Lambda Function Memory Size Resource Parameters"""
 
-        matches = list()
+        matches = []
         matches.extend(
             cfn.check_resource_property(
                 'AWS::Lambda::Function', 'MemorySize',

@@ -14,30 +14,24 @@
   OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
   SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
-import logging
-import cfnlint.core  # pylint: disable=E0401
-from testlib.testcase import BaseTestCase
-
-LOGGER = logging.getLogger('cfnlint')
+from cfnlint.rules.resources.rds.InstanceSize import InstanceSize  # pylint: disable=E0401
+from ... import BaseRuleTestCase
 
 
-class TestLogging(BaseTestCase):
-    """Test Logging Arguments """
-    def tearDown(self):
+class TestInstanceSize(BaseRuleTestCase):
+    """Test RDS Instance Size Configuration"""
+    def setUp(self):
         """Setup"""
-        for handler in LOGGER.handlers:
-            LOGGER.removeHandler(handler)
+        super(TestInstanceSize, self).setUp()
+        self.collection.register(InstanceSize())
+        self.success_templates = [
+            'fixtures/templates/good/resources/rds/instance_sizes.yaml'
+        ]
 
-    def test_logging_info(self):
-        """Test success run"""
+    def test_file_positive(self):
+        """Test Positive"""
+        self.helper_file_positive()
 
-        cfnlint.core.configure_logging(False)
-        self.assertEqual(logging.INFO, LOGGER.level)
-        self.assertEqual(len(LOGGER.handlers), 1)
-
-    def test_logging_debug(self):
-        """Test debug level"""
-
-        cfnlint.core.configure_logging(True)
-        self.assertEqual(logging.DEBUG, LOGGER.level)
-        self.assertEqual(len(LOGGER.handlers), 1)
+    def test_file_negative_alias(self):
+        """Test failure"""
+        self.helper_file_negative('fixtures/templates/bad/resources/rds/instance_sizes.yaml', 7, ['us-east-1', 'eu-west-3'])

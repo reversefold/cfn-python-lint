@@ -15,6 +15,7 @@
   SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 import re
+import six
 from cfnlint import CloudFormationLintRule
 from cfnlint import RuleMatch
 
@@ -28,16 +29,24 @@ class SecurityGroupDescription(CloudFormationLintRule):
 
     description_regex = r'^([a-z,A-Z,0-9,. _\-:/()#,@[\]+=&;\{\}!$*])*$'
 
+
     # pylint: disable=W0613
     def check_sub(self, value, path, **kwargs):
         """Check SecurityGroup descriptions in Subs"""
         # Just check the raw sub string itself, without the replacements
         # for special characters
-        return self.check_value(value, path)
+        matches = []
+        if isinstance(value, list):
+            if isinstance(value[0], six.string_types):
+                matches.extend(self.check_value(value[0], path[:] + [0]))
+        else:
+            matches.extend(self.check_value(value, path[:]))
+        return matches
+
 
     def check_value(self, value, path):
         """Check SecurityGroup descriptions"""
-        matches = list()
+        matches = []
         full_path = ('/'.join(str(x) for x in path))
 
         # Check max length
@@ -57,7 +66,7 @@ class SecurityGroupDescription(CloudFormationLintRule):
     def match(self, cfn):
         """Check SecurityGroup descriptions"""
 
-        matches = list()
+        matches = []
 
         resources = cfn.get_resources(['AWS::EC2::SecurityGroup'])
 

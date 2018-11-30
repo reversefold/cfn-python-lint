@@ -30,6 +30,7 @@ class Properties(CloudFormationLintRule):
     tags = ['resources']
 
     def __init__(self):
+        super(Properties, self).__init__()
         self.cfn = {}
         self.resourcetypes = {}
         self.propertytypes = {}
@@ -46,7 +47,7 @@ class Properties(CloudFormationLintRule):
 
         """
 
-        matches = list()
+        matches = []
         if isinstance(value, dict) and primtype == 'Json':
             return matches
         if isinstance(value, dict):
@@ -77,47 +78,67 @@ class Properties(CloudFormationLintRule):
 
     def check_list_for_condition(self, text, prop, parenttype, resourcename, propspec, path):
         """Checks lists that are a dict for conditions"""
-        matches = list()
+        matches = []
         if len(text[prop]) == 1:
             for sub_key, sub_value in text[prop].items():
                 if sub_key in cfnlint.helpers.CONDITION_FUNCTIONS:
                     if len(sub_value) == 3:
-                        if isinstance(sub_value[1], list):
-                            for index, item in enumerate(sub_value[1]):
-                                arrproppath = path[:]
+                        for if_i, if_v in enumerate(sub_value[1:]):
+                            condition_path = path[:] + [sub_key, if_i + 1]
+                            if isinstance(if_v, list):
+                                for index, item in enumerate(if_v):
+                                    arrproppath = condition_path[:]
 
-                                arrproppath.append(index)
-                                matches.extend(self.propertycheck(
-                                    item, propspec['ItemType'],
-                                    parenttype, resourcename, arrproppath, False))
-                        else:
-                            message = 'Property {0} should be of type List for resource {1}'
-                            matches.append(
-                                RuleMatch(
-                                    path,
-                                    message.format(prop, resourcename)))
-
-                        if isinstance(sub_value[2], list):
-                            for index, item in enumerate(sub_value[2]):
-                                arrproppath = path[:]
-
-                                arrproppath.append(index)
-                                matches.extend(self.propertycheck(
-                                    item, propspec['ItemType'],
-                                    parenttype, resourcename, arrproppath, False))
-                        else:
-                            message = 'Property {0} should be of type List for resource {1} at {2}'
-                            matches.append(
-                                RuleMatch(
-                                    path + [2],
-                                    message.format(prop, resourcename, ('/'.join(str(x) for x in path)))))
+                                    arrproppath.append(index)
+                                    matches.extend(self.propertycheck(
+                                        item, propspec['ItemType'],
+                                        parenttype, resourcename, arrproppath, False))
+                            elif isinstance(if_v, dict):
+                                if len(if_v) == 1:
+                                    for d_k, d_v in if_v.items():
+                                        if d_k != 'Ref' or d_v != 'AWS::NoValue':
+                                            message = 'Property {0} should be of type List for resource {1} at {2}'
+                                            matches.append(
+                                                RuleMatch(
+                                                    condition_path,
+                                                    message.format(prop, resourcename, ('/'.join(str(x) for x in condition_path)))))
+                                else:
+                                    message = 'Property {0} should be of type List for resource {1} at {2}'
+                                    matches.append(
+                                        RuleMatch(
+                                            condition_path,
+                                            message.format(prop, resourcename, ('/'.join(str(x) for x in condition_path)))))
+                            else:
+                                message = 'Property {0} should be of type List for resource {1} at {2}'
+                                matches.append(
+                                    RuleMatch(
+                                        condition_path,
+                                        message.format(prop, resourcename, ('/'.join(str(x) for x in condition_path)))))
 
                     else:
                         message = 'Invalid !If condition specified at %s' % ('/'.join(map(str, path)))
                         matches.append(RuleMatch(path, message))
                 else:
-                    message = 'Property is an object instead of List at %s' % ('/'.join(map(str, path)))
-                    matches.append(RuleMatch(path, message))
+                    # FindInMaps can be lists of objects so skip checking those
+                    if sub_key != 'Fn::FindInMap':
+                        # if its a GetAtt to a custom resource that custom resource
+                        # can return a list of objects so skip.
+                        if sub_key == 'Fn::GetAtt':
+                            resource_name = None
+                            if isinstance(sub_value, list):
+                                resource_name = sub_value[0]
+                            elif isinstance(sub_value, six.string_types):
+                                resource_name = sub_value.split('.')[0]
+                            if resource_name:
+                                resource_type = self.cfn.template.get('Resources', {}).get(resource_name, {}).get('Type')
+                                if not (resource_type == 'AWS::CloudFormation::CustomResource' or resource_type.startswith('Custom::')):
+                                    message = 'Property is an object instead of List at %s' % ('/'.join(map(str, path)))
+                                    matches.append(RuleMatch(path, message))
+                        else:
+                            message = 'Property is an object instead of List at %s' % ('/'.join(map(str, path)))
+                            matches.append(RuleMatch(path, message))
+                    else:
+                        self.logger.debug('Too much logic to handle whats actually in the map "%s" so skipping any more validation.', sub_value)
         else:
             message = 'Property is an object instead of List at %s' % ('/'.join(map(str, path)))
             matches.append(RuleMatch(path, message))
@@ -146,7 +167,7 @@ class Properties(CloudFormationLintRule):
         """Check individual properties"""
 
         parameternames = self.parameternames
-        matches = list()
+        matches = []
         if root:
             specs = self.resourcetypes
             resourcetype = parenttype
@@ -173,17 +194,24 @@ class Properties(CloudFormationLintRule):
                 matches.append(RuleMatch(path, message))
             return matches
 
+        # You can put in functions directly in place of objects as long as that is
+        # the only thing there (conditions, select) could all (possibly)
+        # return objects.  FindInMap cannot directly return an object.
+        len_of_text = len(text)
+
         for prop in text:
             proppath = path[:]
             proppath.append(prop)
             if prop not in resourcespec:
-                if prop in cfnlint.helpers.CONDITION_FUNCTIONS:
+                if prop in cfnlint.helpers.CONDITION_FUNCTIONS and len_of_text == 1:
                     cond_values = self.cfn.get_condition_values(text[prop])
                     for cond_value in cond_values:
                         matches.extend(self.propertycheck(
                             cond_value['Value'], proptype, parenttype, resourcename,
                             proppath + cond_value['Path'], root))
-                elif prop != 'Metadata' and not supports_additional_properties:
+                elif text.is_function_returning_object():
+                    self.logger.debug('Ran into function "%s".  Skipping remaining checks', prop)
+                elif not supports_additional_properties:
                     message = 'Invalid Property %s' % ('/'.join(map(str, proppath)))
                     matches.append(RuleMatch(proppath, message))
             else:
@@ -222,7 +250,7 @@ class Properties(CloudFormationLintRule):
                                     if ref in parameternames:
                                         param_type = self.cfn.template['Parameters'][ref]['Type']
                                         if param_type:
-                                            if not param_type.startswith('List<') and not param_type == 'CommaDelimitedList':
+                                            if 'List<' not in param_type and '<List' not in param_type and not param_type == 'CommaDelimitedList':
                                                 message = 'Property {0} should be of type List or Parameter should ' \
                                                           'be a list for resource {1}'
                                                 matches.append(
@@ -254,7 +282,7 @@ class Properties(CloudFormationLintRule):
 
     def match(self, cfn):
         """Check CloudFormation Properties"""
-        matches = list()
+        matches = []
         self.cfn = cfn
 
         resourcespecs = cfnlint.helpers.RESOURCE_SPECS[cfn.regions[0]]
@@ -264,7 +292,7 @@ class Properties(CloudFormationLintRule):
         for resourcename, resourcevalue in cfn.get_resources().items():
             if 'Properties' in resourcevalue and 'Type' in resourcevalue:
                 resourcetype = resourcevalue.get('Type', None)
-                if resourcetype.startswith('Custom::'):
+                if resourcetype.startswith('Custom::') and resourcetype not in self.resourcetypes:
                     resourcetype = 'AWS::CloudFormation::CustomResource'
                 if resourcetype in self.resourcetypes:
                     path = ['Resources', resourcename, 'Properties']

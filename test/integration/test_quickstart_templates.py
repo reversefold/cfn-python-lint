@@ -25,7 +25,7 @@ class TestQuickStartTemplates(BaseTestCase):
     """Test QuickStart Templates Parsing """
     def setUp(self):
         """ SetUp template object"""
-        self.rules = RulesCollection()
+        self.rules = RulesCollection(include_rules=['I'])
         rulesdirs = [DEFAULT_RULESDIR]
         for rulesdir in rulesdirs:
             self.rules.extend(
@@ -91,7 +91,7 @@ class TestQuickStartTemplates(BaseTestCase):
             template = cfnlint.decode.cfn_yaml.load(filename)
 
             runner = Runner(self.rules, filename, template, ['us-east-1'])
-            matches = list()
+            matches = []
             matches.extend(runner.transform())
             if not matches:
                 matches.extend(runner.run())

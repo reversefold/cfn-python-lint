@@ -30,23 +30,23 @@ class Subnet(CloudFormationLintRule):
 
     def check_az_value(self, value, path):
         """Check AZ Values"""
-        matches = list()
+        matches = []
 
         if value not in AVAILABILITY_ZONES:
             message = 'Not a valid Availbility Zone {0} at {1}'
-            matches.append(RuleMatch(path, message.format(value, ('/'.join(path)))))
+            matches.append(RuleMatch(path, message.format(value, ('/'.join(map(str, path))))))
         return matches
 
     def check_az_ref(self, value, path, parameters, resources):
         """Check ref for AZ"""
-        matches = list()
+        matches = []
         allowed_types = [
             'AWS::EC2::AvailabilityZone::Name',
             'String'
         ]
         if value in resources:
             message = 'AvailabilityZone can\'t use a Ref to a resource for {0}'
-            matches.append(RuleMatch(path, message.format(('/'.join(path)))))
+            matches.append(RuleMatch(path, message.format(('/'.join(map(str, path))))))
         elif value in parameters:
             parameter = parameters.get(value, {})
             param_type = parameter.get('Type', '')
@@ -63,7 +63,7 @@ class Subnet(CloudFormationLintRule):
 
     def check_cidr_value(self, value, path):
         """Check CIDR Strings"""
-        matches = list()
+        matches = []
 
         if not re.match(REGEX_CIDR, value):
             message = 'CidrBlock needs to be of x.x.x.x/y at {0}'
@@ -72,7 +72,7 @@ class Subnet(CloudFormationLintRule):
 
     def check_cidr_ref(self, value, path, parameters, resources):
         """Check CidrBlock for VPC"""
-        matches = list()
+        matches = []
 
         allowed_types = [
             'String'
@@ -101,20 +101,20 @@ class Subnet(CloudFormationLintRule):
 
     def check_vpc_value(self, value, path):
         """Check VPC Values"""
-        matches = list()
+        matches = []
 
         if not value.startswith('vpc-'):
             message = 'VpcId needs to be of format vpc-xxxxxxxx at {1}'
-            matches.append(RuleMatch(path, message.format(value, ('/'.join(path)))))
+            matches.append(RuleMatch(path, message.format(value, ('/'.join(map(str, path))))))
         return matches
 
     def check_vpc_ref(self, value, path, parameters, resources):
         """Check ref for VPC"""
-        matches = list()
+        matches = []
         if value in resources:
             # Check if resource is a VPC
             message = 'VpcId can\'t use a Ref to a resource for {0}'
-            matches.append(RuleMatch(path, message.format(('/'.join(path)))))
+            matches.append(RuleMatch(path, message.format(('/'.join(map(str, path))))))
         elif value in parameters:
             parameter = parameters.get(value, {})
             param_type = parameter.get('Type', '')
@@ -127,7 +127,7 @@ class Subnet(CloudFormationLintRule):
     def match(self, cfn):
         """Check EC2 VPC Resource Parameters"""
 
-        matches = list()
+        matches = []
         matches.extend(
             cfn.check_resource_property(
                 'AWS::EC2::Subnet', 'AvailabilityZone',

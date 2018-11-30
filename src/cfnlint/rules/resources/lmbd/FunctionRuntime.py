@@ -28,28 +28,27 @@ class FunctionRuntime(CloudFormationLintRule):
 
     runtimes = [
         'nodejs', 'nodejs4.3', 'nodejs6.10', 'nodejs8.10', 'java8', 'python2.7',
-        'python3.6', 'dotnetcore1.0', 'dotnetcore2.0', 'dotnetcore2.1',
+        'python3.6', 'python3.7', 'dotnetcore1.0', 'dotnetcore2.0', 'dotnetcore2.1',
         'nodejs4.3-edge', 'go1.x'
     ]
 
     def check_value(self, value, path):
         """ Check runtime value """
-        matches = list()
-
-        message = 'You must specify a valid value for runtime ({0}) at {1}'
+        matches = []
+        message = 'You must specify a valid value for runtime ({0}) at {1}.\nValid values are {2}'
 
         if value not in self.runtimes:
-            matches.append(RuleMatch(path, message.format(value, ('/'.join(path)))))
+            matches.append(RuleMatch(path, message.format(value, ('/'.join(map(str, path))), self.runtimes)))
 
         return matches
 
     def check_ref(self, value, path, parameters, resources):
         """ Check Memory Size Ref """
 
-        matches = list()
+        matches = []
         if value in resources:
             message = 'Runtime can\'t use a Ref to a resource for {0}'
-            matches.append(RuleMatch(path, message.format(('/'.join(path)))))
+            matches.append(RuleMatch(path, message.format(('/'.join(map(str, path))))))
         elif value in parameters:
             parameter = parameters.get(value, {})
             param_type = parameter.get('Type', '')
@@ -64,7 +63,7 @@ class FunctionRuntime(CloudFormationLintRule):
     def match(self, cfn):
         """Check Lambda Function Memory Size Resource Parameters"""
 
-        matches = list()
+        matches = []
         matches.extend(
             cfn.check_resource_property(
                 'AWS::Lambda::Function', 'Runtime',

@@ -30,6 +30,7 @@ class Exclusive(CloudFormationLintRule):
 
     def __init__(self):
         """Init"""
+        super(Exclusive, self).__init__()
         exclusivespec = cfnlint.helpers.load_resources('data/AdditionalSpecs/Exclusive.json')
         self.resource_types_specs = exclusivespec['ResourceTypes']
         self.property_types_specs = exclusivespec['PropertyTypes']
@@ -40,13 +41,13 @@ class Exclusive(CloudFormationLintRule):
 
     def check(self, properties, exclusions, path):
         """Check itself"""
-        matches = list()
+        matches = []
 
         for prop in properties:
             if prop in exclusions:
                 for excl_property in exclusions[prop]:
                     if excl_property in properties:
-                        message = 'Parameter {0} should NOT exist with {1} for {2}'
+                        message = 'Property {0} should NOT exist with {1} for {2}'
                         matches.append(RuleMatch(
                             path + [prop],
                             message.format(excl_property, prop, '/'.join(map(str, path)))
@@ -56,7 +57,7 @@ class Exclusive(CloudFormationLintRule):
 
     def match_resource_sub_properties(self, properties, property_type, path, _):
         """Match for sub properties"""
-        matches = list()
+        matches = []
 
         exclusions = self.property_types_specs.get(property_type, {})
         matches.extend(self.check(properties, exclusions, path))
@@ -65,7 +66,7 @@ class Exclusive(CloudFormationLintRule):
 
     def match_resource_properties(self, properties, resource_type, path, _):
         """Check CloudFormation Properties"""
-        matches = list()
+        matches = []
 
         exclusions = self.resource_types_specs.get(resource_type, {})
         matches.extend(self.check(properties, exclusions, path))

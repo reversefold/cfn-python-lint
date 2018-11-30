@@ -24,13 +24,26 @@ LOGGER = logging.getLogger('cfnlint')
 
 def main():
     """Main function"""
-    (args, filename, template, rules, formatter) = cfnlint.core.get_template_args_rules(sys.argv[1:])
+    try:
+        (args, filenames, formatter) = cfnlint.core.get_args_filenames(sys.argv[1:])
+        matches = []
+        for filename in filenames:
+            LOGGER.debug('Begin linting of file: %s', str(filename))
+            (template, rules, template_matches) = cfnlint.core.get_template_rules(filename, args)
+            if not template_matches:
+                matches.extend(
+                    cfnlint.core.run_cli(
+                        filename, template, rules,
+                        args.regions, args.override_spec))
+            else:
+                matches.extend(template_matches)
+            LOGGER.debug('Completed linting of file: %s', str(filename))
 
-    return(
-        cfnlint.core.run_cli(
-            filename, template, rules,
-            args.regions,
-            args.override_spec, formatter))
+        formatter.print_matches(matches)
+        return cfnlint.core.get_exit_code(matches)
+    except cfnlint.core.CfnLintExitException as e:
+        LOGGER.error(str(e))
+        return e.exit_code
 
 
 if __name__ == '__main__':

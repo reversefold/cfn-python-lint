@@ -32,9 +32,10 @@ class CidrAllowedValues(CloudFormationLintRule):
 
     def __init__(self):
         """Init"""
+        super(CidrAllowedValues, self).__init__()
         resource_type_specs = [
             'AWS::EC2::Subnet',
-            'AWS::EC2::Vpc',
+            'AWS::EC2::VPC',
             'AWS::RDS::DBSecurityGroupIngress',
             'AWS::EC2::NetworkAclEntry',
             'AWS::EC2::SecurityGroupIngress',
@@ -58,7 +59,7 @@ class CidrAllowedValues(CloudFormationLintRule):
     # pylint: disable=W0613
     def check_cidr_ref(self, value, path, parameters, resources):
         """Check ref for VPC"""
-        matches = list()
+        matches = []
 
         if value in parameters:
             parameter = parameters.get(value, {})
@@ -74,7 +75,7 @@ class CidrAllowedValues(CloudFormationLintRule):
 
     def check(self, properties, resource_type, path, cfn):
         """Check itself"""
-        matches = list()
+        matches = []
 
         matches.extend(
             cfn.check_value(
@@ -109,7 +110,7 @@ class CidrAllowedValues(CloudFormationLintRule):
 
     def match_resource_sub_properties(self, properties, property_type, path, cfn):
         """Match for sub properties"""
-        matches = list()
+        matches = []
 
         matches.extend(self.check(properties, property_type, path, cfn))
 
@@ -117,7 +118,7 @@ class CidrAllowedValues(CloudFormationLintRule):
 
     def match_resource_properties(self, properties, resource_type, path, cfn):
         """Check CloudFormation Properties"""
-        matches = list()
+        matches = []
 
         matches.extend(self.check(properties, resource_type, path, cfn))
 

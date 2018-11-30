@@ -14,29 +14,24 @@
   OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
   SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
-import logging
-import cfnlint.core  # pylint: disable=E0401
-from testlib.testcase import BaseTestCase
-
-LOGGER = logging.getLogger('cfnlint')
+from cfnlint.rules.resources.events.RuleTargetsLimit import RuleTargetsLimit  # pylint: disable=E0401
+from ... import BaseRuleTestCase
 
 
-class TestArgsParser(BaseTestCase):
-    """Test Parser Arguments """
-    def tearDown(self):
+class TestRuleTargetsLimit(BaseRuleTestCase):
+    """Test Limits of Event Rules Targets"""
+    def setUp(self):
         """Setup"""
-        for handler in LOGGER.handlers:
-            LOGGER.removeHandler(handler)
+        super(TestRuleTargetsLimit, self).setUp()
+        self.collection.register(RuleTargetsLimit())
+        self.success_templates = [
+            'fixtures/templates/good/resources/events/rule_targets_limit.yaml'
+        ]
 
-    def test_create_parser(self):
-        """Test success run"""
+    def test_file_positive(self):
+        """Test Positive"""
+        self.helper_file_positive()
 
-        parser = cfnlint.core.create_parser()
-        args = parser.parse_args([
-            '--template', 'test.yaml', '--ignore-bad-template',
-            '--format', 'quiet', '--debug'])
-        self.assertEqual(args.template, None)
-        self.assertEqual(args.template_alt, 'test.yaml')
-        self.assertEqual(args.ignore_bad_template, True)
-        self.assertEqual(args.format, 'quiet')
-        self.assertEqual(args.debug, True)
+    def test_file_negative_alias(self):
+        """Test failure"""
+        self.helper_file_negative('fixtures/templates/bad/resources/events/rule_targets_limit.yaml', 1)

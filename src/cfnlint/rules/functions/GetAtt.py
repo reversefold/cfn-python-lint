@@ -14,6 +14,7 @@
   OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
   SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
+import six
 from cfnlint import CloudFormationLintRule
 from cfnlint import RuleMatch
 import cfnlint.helpers
@@ -28,6 +29,7 @@ class GetAtt(CloudFormationLintRule):
     tags = ['functions', 'getatt']
 
     def __init__(self):
+        super(GetAtt, self).__init__()
         resourcespecs = cfnlint.helpers.RESOURCE_SPECS['us-east-1']
         self.resourcetypes = resourcespecs['ResourceTypes']
         self.propertytypes = resourcespecs['PropertyTypes']
@@ -35,7 +37,7 @@ class GetAtt(CloudFormationLintRule):
     def match(self, cfn):
         """Check CloudFormation GetAtt"""
 
-        matches = list()
+        matches = []
 
         getatts = cfn.search_deep_keys('Fn::GetAtt')
         valid_getatts = cfn.get_valid_getatts()
@@ -44,8 +46,12 @@ class GetAtt(CloudFormationLintRule):
                 message = 'Invalid GetAtt for {0}'
                 matches.append(RuleMatch(getatt, message.format('/'.join(map(str, getatt[:-1])))))
                 continue
-            resname = getatt[-1][0]
-            restype = '.'.join(getatt[-1][1:])
+            if isinstance(getatt[-1], six.string_types):
+                resname, restype = getatt[-1].split('.')
+            else:
+                resname = getatt[-1][0]
+                restype = '.'.join(getatt[-1][1:])
+
             if resname in valid_getatts:
                 if restype not in valid_getatts[resname] and '*' not in valid_getatts[resname]:
                     message = 'Invalid GetAtt {0}.{1} for resource {2}'

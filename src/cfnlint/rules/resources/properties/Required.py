@@ -31,6 +31,7 @@ class Required(CloudFormationLintRule):
     cfn = {}
 
     def __init__(self):
+        super(Required, self).__init__()
         resourcespecs = cfnlint.helpers.RESOURCE_SPECS['us-east-1']
         self.resourcetypes = resourcespecs['ResourceTypes']
         self.propertytypes = resourcespecs['PropertyTypes']
@@ -38,7 +39,7 @@ class Required(CloudFormationLintRule):
     def propertycheck(self, text, proptype, parenttype, resourcename, tree, root):
         """Check individual properties"""
 
-        matches = list()
+        matches = []
         if root:
             specs = self.resourcetypes
             resourcetype = parenttype
@@ -59,8 +60,13 @@ class Required(CloudFormationLintRule):
             # Covered with Properties not with Required
             return matches
 
+        # Return empty matches if we run into a function that is being used to get an object
+        # Selects could be used to return an object when used with a FindInMap
+        if text.is_function_returning_object():
+            return matches
+
         # Check if all required properties are specified
-        resource_objects = list()
+        resource_objects = []
         base_object_properties = {}
         for key, value in text.items():
             if key not in cfnlint.helpers.CONDITION_FUNCTIONS:
@@ -121,14 +127,14 @@ class Required(CloudFormationLintRule):
 
     def match(self, cfn):
         """Check CloudFormation Properties"""
-        matches = list()
+        matches = []
 
         self.cfn = cfn
 
         for resourcename, resourcevalue in cfn.get_resources().items():
             if 'Properties' in resourcevalue and 'Type' in resourcevalue:
                 resourcetype = resourcevalue['Type']
-                if resourcetype.startswith('Custom::'):
+                if resourcetype.startswith('Custom::') and resourcetype not in self.resourcetypes:
                     resourcetype = 'AWS::CloudFormation::CustomResource'
                 if resourcetype in self.resourcetypes:
                     tree = ['Resources', resourcename, 'Properties']

@@ -19,15 +19,13 @@ before the linter processes the template.
 
 
 ## Install
-### Command line
-From a command prompt run `python setup.py clean --all` then `python setup.py install`
+
+Python 2.7+ and 3.4+ are supported.
 
 ### Pip Install
-`pip install cfn-lint`.  You may need to use sudo.
 
-## Uninstall
-If you have pip installed you can uninstall using `pip uninstall cfn-lint`.  You
-may need to manually remove the cfn-lint binary.
+`pip install cfn-lint`. If pip is not available, run
+`python setup.py clean --all` then `python setup.py install`.
 
 ### Editor Plugins
 There are IDE plugins available to get direct linter feedback from you favorite editor:
@@ -40,10 +38,44 @@ There are IDE plugins available to get direct linter feedback from you favorite 
 * [Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=kddejong.vscode-cfn-lint)
 * [IntelliJ IDEA](https://plugins.jetbrains.com/plugin/10973-cfn-lint/update/48247)
 
+## Basic Usage
+- `cfn-lint template.yaml`
+- `cfn-lint -t template.yaml`
+
+##### Lint multiple files
+Multiple files can be linted by either specifying multiple specific files:
+
+- `cfn-lint template1.yaml template2.yaml`
+- `cfn-lint -t template1.yaml template2.yaml`
+
+
+Multiple files can also be specified using wildcards (globbing):
+
+Lint all `yaml` files in `path`:
+- `cfn-lint path/*.yaml`
+
+Lint all `yaml` files in `path` and all subdirectories (recursive):
+- `cfn-lint path/to/templates/**/*.yaml`
+
+##### Specifying the template with other parameters
+- `cfn-lint -r us-east-1 ap-south-1 -- template.yaml`
+- `cfn-lint -r us-east-1 ap-south-1 -t template.yaml`
+
 ## Configuration
 
 ### Command Line
-From a command prompt run `cfn-lint <path to yaml template>` to run standard linting of the template
+From a command prompt run `cfn-lint <path to yaml template>` to run standard linting of the template.
+
+### Config File
+You can define a yaml file in your project or home folder called `.cfnlintrc`.  In that file you can specify settings from the parameter section below.
+
+Example:
+```
+templates:
+- test/fixtures/templates/good/**/*.yaml
+include_checks:
+- I
+```
 
 ### Parameters
 
@@ -59,10 +91,14 @@ Optional parameters:
 | -b, --ignore-bad-template | ignore_bad_template | | Ignores bad template errors |
 | -a, --append-rules | append_rules | [RULESDIR [RULESDIR ...]] | Specify one or more rules directories using one or more --append-rules arguments. |
 | -i, --ignore-checks | ignore_checks | [IGNORE_CHECKS [IGNORE_CHECKS ...]] | Only check rules whose ID do not match or prefix these values.  Examples: <br />- A value of `W` will disable all warnings<br />- `W2` disables all Warnings for Parameter rules.<br />- `W2001` will disable rule `W2001` |
+| -c, --include-checks | INCLUDE_CHECKS [INCLUDE_CHECKS ...] | Include rules whose id match these values
 | -d, --debug |  |  | Specify to enable debug logging |
 | -u, --update-specs | | | Update the CloudFormation Specs.  You may need sudo to run this.  You will need internet access when running this command |
-| -o, --override-spec | | filename | Spec-style file containing custom definitions. Can be used to override CloudFormation specifications. More info [here](#customise-specifications) |
+| -o, --override-spec | | filename | Spec-style file containing custom definitions. Can be used to override CloudFormation specifications. More info [here](#customize-specifications) |
 | -v, --version | | | Version of cfn-lint |
+
+### Info Rules
+To maintain backwards compatibility `info` rules are not included by default.  To include these rules you will need to include `-c I` or `--include-checks I`
 
 ### Metadata
 Inside the root level Metadata key you can configure cfn-lint using the supported parameters.
@@ -79,15 +115,6 @@ Metadata:
 
 ### Precedence
 cfn-lint applies the configuration from the CloudFormation Metadata first and then overrides those values with anything specified in the CLI.
-
-## Examples
-### Basic usage
-`cfn-lint --template template.yaml`
-
-### Test a template based on multiple regions
-`cfn-lint --regions us-east-1 ap-south-1 --template template.yaml`
-
-> E3001 Invalid Type AWS::Batch::ComputeEnvironment for resource testBatch in ap-south-1
 
 ### Getting Started Guides
 There are [getting started guides](/docs/getting_started) available in the documentation section to help with integrating `cfn-lint` or creating rules.
@@ -106,6 +133,21 @@ The linter follows the [CloudFormation specifications](https://docs.aws.amazon.c
 The linter provides the possibility to implement these customized specifications using the `--override-spec` argument.
 
 More information about how this feature works is documented [here](docs/customize_specifications.md)
+
+## pre-commit
+If you'd like cfn-lint to be run automatically when making changes to files in your Git repository, you can install [pre-commit](https://pre-commit.com/) and add the following text to your repositories' `.pre-commit-config.yaml`:
+
+```yaml
+repos:
+-   repo: https://github.com/awslabs/cfn-python-lint
+    rev: v0.7.4 # The version of cfn-lint to use
+    hooks:
+    -   id: cfn-python-lint
+    files: path/to/cfn/dir/.*\.(json|yml|yaml)$
+```
+
+* If you exclude the `files:` line above, every json/yml/yaml file will be checked.
+* You can see available cfn-lint versions on the [releases page](https://github.com/awslabs/cfn-python-lint/releases).
 
 ## Credit
 Will Thames and ansible-lint at https://github.com/willthames/ansible-lint

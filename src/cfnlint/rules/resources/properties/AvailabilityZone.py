@@ -28,6 +28,7 @@ class AvailabilityZone(CloudFormationLintRule):
 
     def __init__(self):
         """Init"""
+        super(AvailabilityZone, self).__init__()
         resource_type_specs = [
             'AWS::DAX::Cluster',
             'AWS::AutoScaling::AutoScalingGroup',
@@ -36,6 +37,7 @@ class AvailabilityZone(CloudFormationLintRule):
             'AWS::OpsWorks::Instance',
             'AWS::RDS::DBInstance',
             'AWS::EC2::Host',
+            'AWS::EC2::Subnet',
             'AWS::DMS::ReplicationInstance',
             'AWS::EC2::Instance'
         ]
@@ -58,7 +60,7 @@ class AvailabilityZone(CloudFormationLintRule):
     # pylint: disable=W0613
     def check_az_value(self, value, path):
         """Check ref for VPC"""
-        matches = list()
+        matches = []
 
         if path[-1] != 'Fn::GetAZs':
             message = 'Don\'t hardcode {0} for AvailabilityZones'
@@ -68,7 +70,7 @@ class AvailabilityZone(CloudFormationLintRule):
 
     def check(self, properties, resource_type, path, cfn):
         """Check itself"""
-        matches = list()
+        matches = []
 
         matches.extend(
             cfn.check_value(
@@ -89,7 +91,7 @@ class AvailabilityZone(CloudFormationLintRule):
 
     def match_resource_sub_properties(self, properties, property_type, path, cfn):
         """Match for sub properties"""
-        matches = list()
+        matches = []
 
         matches.extend(self.check(properties, property_type, path, cfn))
 
@@ -97,7 +99,7 @@ class AvailabilityZone(CloudFormationLintRule):
 
     def match_resource_properties(self, properties, resource_type, path, cfn):
         """Check CloudFormation Properties"""
-        matches = list()
+        matches = []
 
         matches.extend(self.check(properties, resource_type, path, cfn))
 

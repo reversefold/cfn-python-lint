@@ -23,14 +23,14 @@ class Sub(CloudFormationLintRule):
     """Check if Sub values are correct"""
     id = 'E1019'
     shortdesc = 'Sub validation of parameters'
-    description = 'Making sure the split function is properly configured'
+    description = 'Making sure the sub function is properly configured'
     source_url = 'https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-sub.html'
     tags = ['functions', 'sub']
 
     def _test_string(self, cfn, sub_string, parameters, tree):
         """Test if a string has appropriate parameters"""
 
-        matches = list()
+        matches = []
         string_params = cfn.get_sub_parameters(sub_string)
         get_atts = cfn.get_valid_getatts()
 
@@ -84,7 +84,7 @@ class Sub(CloudFormationLintRule):
             'Ref'
         ]
 
-        matches = list()
+        matches = []
         for parameter_name, parameter_value_obj in parameters.items():
             param_tree = tree[:] + [parameter_name]
             if isinstance(parameter_value_obj, dict):
@@ -108,7 +108,7 @@ class Sub(CloudFormationLintRule):
     def match(self, cfn):
         """Check CloudFormation Join"""
 
-        matches = list()
+        matches = []
 
         sub_objs = cfn.search_deep_keys('Fn::Sub')
 

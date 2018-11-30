@@ -17,8 +17,8 @@
 import re
 from cfnlint import CloudFormationLintRule
 from cfnlint import RuleMatch
-
 from cfnlint.helpers import REGEX_IPV4, REGEX_IPV6, REGEX_ALPHANUMERIC
+
 
 class RecordSet(CloudFormationLintRule):
     """Check Route53 Recordset Configuration"""
@@ -45,10 +45,11 @@ class RecordSet(CloudFormationLintRule):
     ]
 
     REGEX_CNAME = re.compile(r'^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])(.)$')
+    REGEX_TXT = re.compile(r'^("[^"]{1,255}" *)*"[^"]{1,255}"$')
 
     def check_a_record(self, path, recordset):
         """Check A record Configuration"""
-        matches = list()
+        matches = []
 
         resource_records = recordset.get('ResourceRecords')
         for index, record in enumerate(resource_records):
@@ -65,7 +66,7 @@ class RecordSet(CloudFormationLintRule):
 
     def check_aaaa_record(self, path, recordset):
         """Check AAAA record Configuration"""
-        matches = list()
+        matches = []
 
         resource_records = recordset.get('ResourceRecords')
         for index, record in enumerate(resource_records):
@@ -82,7 +83,7 @@ class RecordSet(CloudFormationLintRule):
 
     def check_caa_record(self, path, recordset):
         """Check CAA record Configuration"""
-        matches = list()
+        matches = []
 
         resource_records = recordset.get('ResourceRecords')
 
@@ -121,7 +122,7 @@ class RecordSet(CloudFormationLintRule):
 
     def check_cname_record(self, path, recordset):
         """Check CNAME record Configuration"""
-        matches = list()
+        matches = []
 
         resource_records = recordset.get('ResourceRecords')
         if len(resource_records) > 1:
@@ -142,7 +143,7 @@ class RecordSet(CloudFormationLintRule):
 
     def check_txt_record(self, path, recordset):
         """Check TXT record Configuration"""
-        matches = list()
+        matches = []
 
         # Check quotation of the records
         resource_records = recordset.get('ResourceRecords')
@@ -150,44 +151,48 @@ class RecordSet(CloudFormationLintRule):
         for index, record in enumerate(resource_records):
             tree = path[:] + ['ResourceRecords', index]
 
-            if not isinstance(record, dict):
-                if not record.startswith('"') or not record.endswith('"'):
-                    message = 'TXT record ({}) has to be enclosed in double quotation marks (")'
-                    matches.append(RuleMatch(tree, message.format(record)))
-                elif len(record) > 255:
-                    message = 'The length of the TXT record ({}) exceeds the limit (255)'
-                    matches.append(RuleMatch(tree, message.format(len(record))))
+            if not isinstance(record, dict) and not re.match(self.REGEX_TXT, record):
+                message = 'TXT record is not structured as one or more items up to 255 characters ' \
+                          'enclosed in double quotation marks at {0}'
+                matches.append(RuleMatch(
+                    tree,
+                    (
+                        message.format('/'.join(map(str, tree)))
+                    ),
+                ))
 
         return matches
 
     def check_recordset(self, path, recordset):
         """Check record configuration"""
 
-        matches = list()
+        matches = []
         recordset_type = recordset.get('Type')
 
-        if recordset_type not in self.VALID_RECORD_TYPES:
-            message = 'Invalid record type "{0}" specified'
-            matches.append(RuleMatch(path + ['Type'], message.format(recordset_type)))
-        elif not recordset.get('AliasTarget'):
-            # Record type specific checks
-            if recordset_type == 'A':
-                matches.extend(self.check_a_record(path, recordset))
-            elif recordset_type == 'AAAA':
-                matches.extend(self.check_aaaa_record(path, recordset))
-            elif recordset_type == 'CAA':
-                matches.extend(self.check_caa_record(path, recordset))
-            elif recordset_type == 'CNAME':
-                matches.extend(self.check_cname_record(path, recordset))
-            elif recordset_type == 'TXT':
-                matches.extend(self.check_txt_record(path, recordset))
+        # Skip Intrinsic functions
+        if not isinstance(recordset_type, dict):
+            if recordset_type not in self.VALID_RECORD_TYPES:
+                message = 'Invalid record type "{0}" specified'
+                matches.append(RuleMatch(path + ['Type'], message.format(recordset_type)))
+            elif not recordset.get('AliasTarget'):
+                # Record type specific checks
+                if recordset_type == 'A':
+                    matches.extend(self.check_a_record(path, recordset))
+                elif recordset_type == 'AAAA':
+                    matches.extend(self.check_aaaa_record(path, recordset))
+                elif recordset_type == 'CAA':
+                    matches.extend(self.check_caa_record(path, recordset))
+                elif recordset_type == 'CNAME':
+                    matches.extend(self.check_cname_record(path, recordset))
+                elif recordset_type == 'TXT':
+                    matches.extend(self.check_txt_record(path, recordset))
 
         return matches
 
     def match(self, cfn):
         """Check RecordSets and RecordSetGroups Properties"""
 
-        matches = list()
+        matches = []
 
         recordsets = cfn.get_resources(['AWS::Route53::RecordSet'])
 

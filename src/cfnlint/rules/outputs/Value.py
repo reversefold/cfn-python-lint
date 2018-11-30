@@ -29,13 +29,14 @@ class Value(CloudFormationLintRule):
     tags = ['outputs']
 
     def __init__(self):
+        super(Value, self).__init__()
         resourcespecs = RESOURCE_SPECS['us-east-1']
         self.resourcetypes = resourcespecs['ResourceTypes']
 
     def match(self, cfn):
         """Check CloudFormation Outputs"""
 
-        matches = list()
+        matches = []
 
         template = cfn.template
 

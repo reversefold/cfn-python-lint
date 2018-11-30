@@ -24,6 +24,7 @@ import six
 from yaml.parser import ParserError
 import cfnlint.helpers
 from cfnlint.transform import Transform
+from cfnlint.decode.node import TemplateAttributeError
 
 LOGGER = logging.getLogger(__name__)
 
@@ -38,8 +39,10 @@ class CloudFormationLintRule(object):
     tags = []
 
     logger = logging.getLogger(__name__)
-    resource_property_types = []
-    resource_sub_property_types = []
+
+    def __init__(self):
+        self.resource_property_types = []
+        self.resource_sub_property_types = []
 
     def __repr__(self):
         return '%s: %s' % (self.id, self.shortdesc)
@@ -123,14 +126,15 @@ class CloudFormationLintRule(object):
 class RulesCollection(object):
     """Collection of rules"""
 
-    def __init__(self, ignore_rules=None):
+    def __init__(self, ignore_rules=None, include_rules=None):
         self.rules = []
 
         # Make Ignore Rules not required
-        if ignore_rules:
-            self.ignore_rules = ignore_rules
-        else:
-            self.ignore_rules = []
+        self.ignore_rules = ignore_rules or []
+        self.include_rules = include_rules or []
+        # by default include 'W' and 'E'
+        # 'I' has to be included manually for backwards compabitility
+        self.include_rules.extend(['W', 'E'])
 
     def register(self, rule):
         """Register rules"""
@@ -155,6 +159,13 @@ class RulesCollection(object):
 
     def is_rule_enabled(self, rule_id):
         """ Cheks if an individual rule is valid """
+        # Evaluate includes first:
+        include_filter = False
+        for include_rule in self.include_rules:
+            if rule_id.startswith(include_rule):
+                include_filter = True
+        if not include_filter:
+            return False
         # Allowing ignoring of rules based on prefix to ignore checks
         for ignore_rule in self.ignore_rules:
             if rule_id.startswith(ignore_rule) and ignore_rule:
@@ -162,9 +173,24 @@ class RulesCollection(object):
 
         return True
 
+    def run_check(self, check, filename, rule_id, *args):
+        """ Run a check """
+        try:
+            return check(*args)
+        except TemplateAttributeError as err:
+            LOGGER.debug(str(err))
+            return []
+        except Exception as err:  # pylint: disable=W0703
+            if self.is_rule_enabled('E0002'):
+                message = 'Unknown exception while processing rule {}: {}'
+                return [
+                    cfnlint.Match(
+                        1, 1, 1, 1,
+                        filename, cfnlint.RuleError(), message.format(rule_id, str(err)))]
+
     def resource_property(self, filename, cfn, path, properties, resource_type, property_type):
         """Run loops in resource checks for embedded properties"""
-        matches = list()
+        matches = []
         property_spec = cfnlint.helpers.RESOURCE_SPECS['us-east-1'].get('PropertyTypes')
         if property_type == 'Tag':
             property_spec_name = 'Tag'
@@ -172,17 +198,12 @@ class RulesCollection(object):
             property_spec_name = '%s.%s' % (resource_type, property_type)
         if property_spec_name in property_spec:
             for rule in self.rules:
-                try:
-                    matches.extend(
-                        rule.matchall_resource_sub_properties(
-                            filename, cfn, properties, property_spec_name, path))
-                except Exception as err:  # pylint: disable=W0703
-                    if self.is_rule_enabled('E0002'):
-                        message = 'Unknown exception while processing rule {}: {}'
-                        matches.append(cfnlint.Match(
-                            1, 1,
-                            1, 1,
-                            filename, cfnlint.RuleError(), message.format(rule.id, str(err))))
+                matches.extend(
+                    self.run_check(
+                        rule.matchall_resource_sub_properties, filename, rule.id,
+                        filename, cfn, properties, property_spec_name, path
+                    )
+                )
 
             resource_spec_properties = property_spec.get(property_spec_name, {}).get('Properties')
             if isinstance(properties, dict):
@@ -221,7 +242,7 @@ class RulesCollection(object):
 
     def run_resource(self, filename, cfn, resource_type, resource_properties, path):
         """Run loops in resource checks for embedded properties"""
-        matches = list()
+        matches = []
         resource_spec = cfnlint.helpers.RESOURCE_SPECS['us-east-1'].get('ResourceTypes')
         if resource_properties and resource_type in resource_spec:
             resource_spec_properties = resource_spec.get(resource_type, {}).get('Properties')
@@ -259,34 +280,25 @@ class RulesCollection(object):
 
     def run(self, filename, cfn):
         """Run rules"""
-        matches = list()
+        matches = []
         for rule in self.rules:
-            try:
-                matches.extend(rule.matchall(filename, cfn))
-            except Exception as err:  # pylint: disable=W0703
-                if self.is_rule_enabled('E0002'):
-                    message = 'Unknown exception while processing rule {}: {}'
-                    matches.append(cfnlint.Match(
-                        1, 1,
-                        1, 1,
-                        filename, cfnlint.RuleError(), message.format(rule.id, str(err))))
+            matches.extend(
+                self.run_check(
+                    rule.matchall, filename, rule.id, filename, cfn
+                )
+            )
 
         for resource_name, resource_attributes in cfn.get_resources().items():
             resource_type = resource_attributes.get('Type')
             resource_properties = resource_attributes.get('Properties', {})
             path = ['Resources', resource_name, 'Properties']
             for rule in self.rules:
-                try:
-                    matches.extend(
-                        rule.matchall_resource_properties(
-                            filename, cfn, resource_properties, resource_type, path))
-                except Exception as err:  # pylint: disable=W0703
-                    if self.is_rule_enabled('E0002'):
-                        message = 'Unknown exception while processing rule {}: {}'
-                        matches.append(cfnlint.Match(
-                            1, 1,
-                            1, 1,
-                            filename, cfnlint.RuleError(), message.format(rule.id, str(err))))
+                matches.extend(
+                    self.run_check(
+                        rule.matchall_resource_properties, filename, rule.id,
+                        filename, cfn, resource_properties, resource_type, path
+                    )
+                )
 
             matches.extend(
                 self.run_resource(
@@ -321,7 +333,7 @@ class RuleMatch(object):
         return hash((self.path, self.message))
 
 
-class Match(object):
+class Match(object):  # pylint: disable=R0902
     """Match Classes"""
 
     def __init__(
@@ -373,6 +385,7 @@ class Template(object):
             'Outputs',
             'Rules'
         ]
+        self.transform_globals = {}
 
     def __deepcopy__(self, memo):
         cls = self.__class__
@@ -423,7 +436,7 @@ class Template(object):
     def get_resource_names(self):
         """Get all the Resource Names"""
         LOGGER.debug('Get the names of all resources from template...')
-        results = list()
+        results = []
         resources = self.template.get('Resources', {})
         if isinstance(resources, dict):
             for resourcename, _ in resources.items():
@@ -434,7 +447,7 @@ class Template(object):
     def get_parameter_names(self):
         """Get all Parameter Names"""
         LOGGER.debug('Get names of all parameters from template...')
-        results = list()
+        results = []
         parameters = self.template.get('Parameters', {})
         if isinstance(parameters, dict):
             for parametername, _ in parameters.items():
@@ -524,7 +537,7 @@ class Template(object):
                     if results:
                         return results
         elif isinstance(properties, list):
-            matches = list()
+            matches = []
             for index, item in enumerate(properties):
                 results = None
                 if isinstance(item, dict):
@@ -532,7 +545,7 @@ class Template(object):
                         for sub_key, sub_value in item.items():
                             if sub_key in cfnlint.helpers.CONDITION_FUNCTIONS:
                                 cond_values = self.get_condition_values(sub_value)
-                                results = list()
+                                results = []
                                 for cond_value in cond_values:
                                     result_path = path[:] + [index, sub_key] + cond_value['Path']
                                     results.extend(
@@ -551,12 +564,12 @@ class Template(object):
                     matches.extend(results)
             return matches
 
-        return list()
+        return []
 
     def get_resource_properties(self, keys):
         """Filter keys of template"""
         LOGGER.debug('Get Properties from a resource: %s', keys)
-        matches = list()
+        matches = []
         resourcetype = keys.pop(0)
         for resource_name, resource_value in self.get_resources(resourcetype).items():
             path = ['Resources', resource_name, 'Properties']
@@ -570,7 +583,7 @@ class Template(object):
     # pylint: disable=dangerous-default-value
     def _search_deep_keys(self, searchText, cfndict, path):
         """Search deep for keys and get their values"""
-        keys = list()
+        keys = []
         if isinstance(cfndict, dict):
             for key in cfndict:
                 pathprop = path[:]
@@ -601,12 +614,16 @@ class Template(object):
             Search for keys in all parts of the templates
         """
         LOGGER.debug('Search for key %s as far down as the template goes', searchText)
-        return (self._search_deep_keys(searchText, self.template, []))
+        results = []
+        results.extend(self._search_deep_keys(searchText, self.template, []))
+        # Globals are removed during a transform.  They need to be checked manually
+        results.extend(self._search_deep_keys(searchText, self.transform_globals, []))
+        return results
 
     def get_condition_values(self, template, path=[]):
         """Evaluates conditions and brings back the values"""
         LOGGER.debug('Get condition values...')
-        matches = list()
+        matches = []
         if not isinstance(template, list):
             return matches
         if not len(template) == 3:
@@ -656,7 +673,7 @@ class Template(object):
 
         """
         LOGGER.debug('Get the value for key %s in %s', key, obj)
-        matches = list()
+        matches = []
 
         if not isinstance(obj, dict):
             return None
@@ -774,7 +791,7 @@ class Template(object):
                                 check_join=None, check_sub=None, **kwargs):
         """ Check Resource Properties """
         LOGGER.debug('Check property %s for %s', resource_property, resource_type)
-        matches = list()
+        matches = []
         resources = self.get_resources(resource_type=resource_type)
         for resource_name, resource_object in resources.items():
             properties = resource_object.get('Properties', {})
@@ -800,7 +817,7 @@ class Template(object):
             Check the value
         """
         LOGGER.debug('Check value %s for %s', key, obj)
-        matches = list()
+        matches = []
         values_obj = self.get_values(obj=obj, key=key)
         new_path = path[:] + [key]
         if not values_obj:
@@ -873,6 +890,8 @@ class Runner(object):
         # useless execution of the transformation.
         # Currently locked in to SAM specific
         if transform_type == 'AWS::Serverless-2016-10-31':
+            # Save the Globals section so its available for rule processing
+            self.cfn.transform_globals = self.cfn.template.get('Globals', {})
             transform = Transform(self.filename, self.cfn.template, self.cfn.regions[0])
             matches = transform.transform_template()
             self.cfn.template = transform.template()
@@ -882,14 +901,14 @@ class Runner(object):
     def run(self):
         """Run rules"""
         LOGGER.debug('Run scan of template...')
-        matches = list()
+        matches = []
         if self.cfn.template is not None:
             matches.extend(
                 self.rules.run(
                     self.filename, self.cfn))
 
         # uniq the list of incidents
-        return_matches = list()
+        return_matches = []
         for _, match in enumerate(matches):
             if not any(match == u for u in return_matches):
                 return_matches.append(match)

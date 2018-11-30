@@ -17,7 +17,6 @@
 from cfnlint.rules.resources.stepfunctions.StateMachine import StateMachine  # pylint: disable=E0401
 from ... import BaseRuleTestCase
 
-
 class TestStateMachine(BaseRuleTestCase):
     """Test StateMachine for Step Functions"""
     def setUp(self):
@@ -34,4 +33,4 @@ class TestStateMachine(BaseRuleTestCase):
 
     def test_file_negative_alias(self):
         """Test failure"""
-        self.helper_file_negative('fixtures/templates/bad/resources/stepfunctions/state_machine.yaml', 4)
+        self.helper_file_negative('fixtures/templates/bad/resources/stepfunctions/state_machine.yaml', 5)

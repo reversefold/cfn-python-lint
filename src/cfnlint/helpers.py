@@ -23,7 +23,7 @@ import logging
 import re
 import inspect
 import pkg_resources
-
+from cfnlint.decode.node import dict_node, list_node, str_node
 
 LOGGER = logging.getLogger(__name__)
 
@@ -34,14 +34,15 @@ CONDITION_FUNCTIONS = ['Fn::If']
 REGIONS = ['us-east-1', 'us-east-2', 'us-west-1', 'us-west-2', 'ca-central-1',
            'eu-central-1', 'eu-west-1', 'eu-west-2', 'ap-northeast-1',
            'ap-northeast-2', 'ap-southeast-1', 'ap-southeast-2', 'ap-south-1',
-           'sa-east-1']
+           'sa-east-1', 'eu-west-3', 'ap-northeast-3']
 
 REGEX_ALPHANUMERIC = re.compile('^[a-zA-Z0-9]*$')
 REGEX_CIDR = re.compile(r'^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$')
 REGEX_IPV4 = re.compile(r'^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$')
 REGEX_IPV6 = re.compile(r'^(((?=.*(::))(?!.*\3.+\3))\3?|[\dA-F]{1,4}:)([\dA-F]{1,4}(\3|:\b)|\2){5}(([\dA-F]{1,4}(\3|:\b|$)|\2){2}|(((2[0-4]|1\d|[1-9])?\d|25[0-5])\.?\b){4})\Z', re.I | re.S)
-REGEX_DYN_REF_SSM = re.compile(r'^.*{{resolve:ssm:[a-zA-Z0-9_.-/]+:\d+}}.*$')
-REGEX_DYN_REF_SSM_SECURE = re.compile(r'^.*{{resolve:ssm-secure:[a-zA-Z0-9_.-/]+:\d+}}.*$')
+REGEX_DYN_REF = re.compile(r'^.*{{resolve:.+}}.*$')
+REGEX_DYN_REF_SSM = re.compile(r'^.*{{resolve:ssm:[a-zA-Z0-9_\.\-/]+:\d+}}.*$')
+REGEX_DYN_REF_SSM_SECURE = re.compile(r'^.*{{resolve:ssm-secure:[a-zA-Z0-9_\.\-/]+:\d+}}.*$')
 
 
 AVAILABILITY_ZONES = [
@@ -63,6 +64,8 @@ AVAILABILITY_ZONES = [
     'ap-southeast-2a', 'ap-southeast-2b', 'ap-southeast-2c',
     'ap-south-1a', 'ap-south-1b',
     'cn-north-1a', 'cn-north-1b',
+    'eu-west-3a', 'eu-west-3b', 'eu-west-3c',
+    'ap-northeast-3a',
 ]
 
 FUNCTIONS = [
@@ -105,9 +108,8 @@ def load_resources(filename='/data/CloudSpecs/us-east-1.json'):
         filename
     )
 
-    data = json.load(open(filename))
-
-    return data
+    with open(filename) as fp:
+        return json.load(fp)
 
 
 RESOURCE_SPECS = {}
@@ -188,7 +190,11 @@ def load_plugins(directory):
     result = []
     fh = None
 
-    for root, _, filenames in os.walk(directory):
+    def onerror(os_error):
+        """Raise an error"""
+        raise os_error
+
+    for root, _, filenames in os.walk(directory, onerror=onerror):
         for filename in fnmatch.filter(filenames, '[A-Za-z]*.py'):
             pluginname = filename.replace('.py', '')
             try:
@@ -203,14 +209,39 @@ def load_plugins(directory):
             finally:
                 if fh:
                     fh.close()
+
     return result
+
+
+def convert_dict(template, start_mark=(0, 0), end_mark=(0, 0)):
+    """Convert dict to template"""
+    if isinstance(template, dict):
+        if not isinstance(template, dict_node):
+            template = dict_node(template, start_mark, end_mark)
+        for k, v in template.copy().items():
+            k_start_mark = start_mark
+            k_end_mark = end_mark
+            if isinstance(k, str_node):
+                k_start_mark = k.start_mark
+                k_end_mark = k.end_mark
+            new_k = str_node(k, k_start_mark, k_end_mark)
+            del template[k]
+            template[new_k] = convert_dict(v, k_start_mark, k_end_mark)
+    elif isinstance(template, list):
+        if not isinstance(template, list_node):
+            template = list_node(template, start_mark, end_mark)
+        for i, v in enumerate(template):
+            template[i] = convert_dict(v, start_mark, end_mark)
+
+    return template
 
 
 def override_specs(override_spec_file):
     """Override specs file"""
     try:
         filename = override_spec_file
-        custom_spec_data = json.load(open(filename))
+        with open(filename) as fp:
+            custom_spec_data = json.load(fp)
 
         set_specs(custom_spec_data)
     except IOError as e:

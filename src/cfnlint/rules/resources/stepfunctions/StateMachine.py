@@ -31,19 +31,21 @@ class StateMachine(CloudFormationLintRule):
 
     def __init__(self):
         """Init"""
+        super(StateMachine, self).__init__()
         self.resource_property_types.append('AWS::StepFunctions::StateMachine')
 
     def _check_state_json(self, def_json, state_name, path):
         """Check State JSON Definition"""
-        matches = list()
+        matches = []
 
+        # https://docs.aws.amazon.com/step-functions/latest/dg/amazon-states-language-common-fields.html
         common_state_keys = [
             'Next',
             'End',
             'Type',
             'Comment',
-            'Input',
-            'Ouptut',
+            'InputPath',
+            'OutputPath',
         ]
         common_state_required_keys = [
             'Type',
@@ -51,7 +53,7 @@ class StateMachine(CloudFormationLintRule):
         state_key_types = {
             'Pass': ['Result', 'ResultPath'],
             'Task': ['Resource', 'ResultPath', 'Retry', 'Catch', 'TimeoutSeconds', 'HeartbeatSeconds'],
-            'Choices': ['Choices', 'Default'],
+            'Choice': ['Choices', 'Default'],
             'Wait': ['Seconds', 'Timestamp', 'SecondsPath', 'TimestampPath'],
             'Succeed': [],
             'Fail': ['Cause', 'Error'],
@@ -60,7 +62,7 @@ class StateMachine(CloudFormationLintRule):
         state_required_types = {
             'Pass': [],
             'Task': ['Resource'],
-            'Choices': ['Choices'],
+            'Choice': ['Choices'],
             'Wait': [],
             'Succeed': [],
             'Fail': [],
@@ -75,21 +77,25 @@ class StateMachine(CloudFormationLintRule):
 
         state_type = def_json.get('Type')
 
-        for state_key, _ in def_json.items():
-            if state_key not in common_state_keys + state_key_types.get(state_type):
-                message = 'State Machine Definition key (%s) for State (%s) of Type (%s) is not valid' % (state_key, state_name, state_type)
-                matches.append(RuleMatch(path, message))
-        for req_key in common_state_required_keys + state_required_types.get(state_type):
-            if req_key not in def_json:
-                message = 'State Machine Definition required key (%s) for State (%s) of Type (%s) is missing' % (req_key, state_name, state_type)
-                matches.append(RuleMatch(path, message))
-                return matches
+        if state_type in state_key_types:
+            for state_key, _ in def_json.items():
+                if state_key not in common_state_keys + state_key_types.get(state_type, []):
+                    message = 'State Machine Definition key (%s) for State (%s) of Type (%s) is not valid' % (state_key, state_name, state_type)
+                    matches.append(RuleMatch(path, message))
+            for req_key in common_state_required_keys + state_required_types.get(state_type, []):
+                if req_key not in def_json:
+                    message = 'State Machine Definition required key (%s) for State (%s) of Type (%s) is missing' % (req_key, state_name, state_type)
+                    matches.append(RuleMatch(path, message))
+                    return matches
+        else:
+            message = 'State Machine Definition Type (%s) is not valid' % (state_type)
+            matches.append(RuleMatch(path, message))
 
         return matches
 
     def _check_definition_json(self, def_json, path):
         """Check JSON Definition"""
-        matches = list()
+        matches = []
 
         top_level_keys = [
             'Comment',
@@ -116,15 +122,19 @@ class StateMachine(CloudFormationLintRule):
             matches.extend(self._check_state_json(state_value, state_name, path))
         return matches
 
-    def check_value(self, value, path):
+    def check_value(self, value, path, fail_on_loads=True):
         """Check Definition Value"""
-        matches = list()
+        matches = []
         try:
             def_json = json.loads(value)
         # pylint: disable=W0703
         except Exception as err:
-            message = 'State Machine Definition needs to be formatted as JSON. Error %s' % err
-            matches.append(RuleMatch(path, message))
+            if fail_on_loads:
+                message = 'State Machine Definition needs to be formatted as JSON. Error %s' % err
+                matches.append(RuleMatch(path, message))
+                return matches
+
+            self.logger.debug('State Machine definition could not be parsed. Skipping')
             return matches
 
         matches.extend(self._check_definition_json(def_json, path))
@@ -132,17 +142,17 @@ class StateMachine(CloudFormationLintRule):
 
     def check_sub(self, value, path):
         """Check Sub Object"""
-        matches = list()
+        matches = []
         if isinstance(value, list):
-            matches.extend(self.check_value(value[0], path))
+            matches.extend(self.check_value(value[0], path, False))
         elif isinstance(value, six.string_types):
-            matches.extend(self.check_value(value, path))
+            matches.extend(self.check_value(value, path, False))
 
         return matches
 
     def match_resource_properties(self, properties, _, path, cfn):
         """Check CloudFormation Properties"""
-        matches = list()
+        matches = []
 
         matches.extend(
             cfn.check_value(

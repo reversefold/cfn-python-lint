@@ -31,6 +31,7 @@ class OnlyOne(CloudFormationLintRule):
 
     def __init__(self):
         """Init"""
+        super(OnlyOne, self).__init__()
         onlyonespec = cfnlint.helpers.load_resources('data/AdditionalSpecs/OnlyOne.json')
         self.resource_types_specs = onlyonespec['ResourceTypes']
         self.property_types_specs = onlyonespec['PropertyTypes']
@@ -41,7 +42,7 @@ class OnlyOne(CloudFormationLintRule):
 
     def check(self, properties, onlyoneprops, path, cfn):
         """Check itself"""
-        matches = list()
+        matches = []
         property_sets = cfn.get_values({'Properties': properties}, 'Properties', path)
         for property_set in property_sets:
             for onlyoneprop in onlyoneprops:
@@ -61,7 +62,7 @@ class OnlyOne(CloudFormationLintRule):
 
     def match_resource_sub_properties(self, properties, property_type, path, cfn):
         """Match for sub properties"""
-        matches = list()
+        matches = []
 
         onlyoneprops = self.property_types_specs.get(property_type, {})
         matches.extend(self.check(properties, onlyoneprops, path, cfn))
@@ -70,7 +71,7 @@ class OnlyOne(CloudFormationLintRule):
 
     def match_resource_properties(self, properties, resource_type, path, cfn):
         """Check CloudFormation Properties"""
-        matches = list()
+        matches = []
 
         onlyoneprops = self.resource_types_specs.get(resource_type, {})
         matches.extend(self.check(properties, onlyoneprops, path, cfn))

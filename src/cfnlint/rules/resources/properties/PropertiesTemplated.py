@@ -29,6 +29,7 @@ class PropertiesTemplated(CloudFormationLintRule):
     tags = ['resources']
 
     def __init__(self):
+        super(PropertiesTemplated, self).__init__()
         self.resource_property_types.extend([
             'AWS::ApiGateway::RestApi',
             'AWS::Lambda::Function',
@@ -37,7 +38,7 @@ class PropertiesTemplated(CloudFormationLintRule):
 
     def check_value(self, value, path):
         """ Check the value """
-        matches = list()
+        matches = []
         if isinstance(value, six.string_types):
             message = 'This code may only work with `package` cli command as the property (%s) is a string' % ('/'.join(map(str, path)))
             matches.append(RuleMatch(path, message))
@@ -46,7 +47,7 @@ class PropertiesTemplated(CloudFormationLintRule):
 
     def match_resource_properties(self, properties, resourcetype, path, cfn):
         """Check CloudFormation Properties"""
-        matches = list()
+        matches = []
 
         templated_exceptions = {
             'AWS::ApiGateway::RestApi': ['BodyS3Location'],

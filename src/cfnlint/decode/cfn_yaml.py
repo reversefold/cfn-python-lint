@@ -26,7 +26,7 @@ from yaml import MappingNode
 from yaml.constructor import SafeConstructor
 from yaml.constructor import ConstructorError
 import cfnlint
-from cfnlint.decode.str_node import str_node
+from cfnlint.decode.node import str_node, dict_node, list_node
 
 try:
     from yaml.cyaml import CParser as Parser  # pylint: disable=ungrouped-imports
@@ -94,18 +94,23 @@ class NodeConstructor(SafeConstructor):
             mapping[key] = value
 
         obj, = SafeConstructor.construct_yaml_map(self, node)
-        return obj
+        return dict_node(obj, node.start_mark, node.end_mark)
 
     def construct_yaml_str(self, node):
         obj = SafeConstructor.construct_yaml_str(self, node)
         assert isinstance(obj, (six.string_types))
         return str_node(obj, node.start_mark, node.end_mark)
 
+    def construct_yaml_seq(self, node):
+        obj, = SafeConstructor.construct_yaml_seq(self, node)
+        assert isinstance(obj, list)
+        return list_node(obj, node.start_mark, node.end_mark)
+
     def construct_yaml_null_error(self, node):
         """Throw a null error"""
         raise CfnParseError(
             self.filename,
-            'Null value at line {0} column {1}'.format(node.start_mark.line, node.start_mark.column),
+            'Null value at line {0} column {1}'.format(node.start_mark.line + 1, node.start_mark.column + 1),
             node.start_mark.line, node.start_mark.column, ' ')
 
 
@@ -116,6 +121,10 @@ NodeConstructor.add_constructor(
 NodeConstructor.add_constructor(
     u'tag:yaml.org,2002:str',
     NodeConstructor.construct_yaml_str)
+
+NodeConstructor.add_constructor(
+    u'tag:yaml.org,2002:seq',
+    NodeConstructor.construct_yaml_seq)
 
 NodeConstructor.add_constructor(
     u'tag:yaml.org,2002:null',
@@ -149,7 +158,6 @@ def multi_constructor(loader, tag_suffix, node):
         tag_suffix = '{}{}'.format(FN_PREFIX, tag_suffix)
 
     constructor = None
-
     if tag_suffix == 'Fn::GetAtt':
         constructor = construct_getatt
     elif isinstance(node, ScalarNode):
@@ -161,7 +169,7 @@ def multi_constructor(loader, tag_suffix, node):
     else:
         raise 'Bad tag: !{}'.format(tag_suffix)
 
-    return {tag_suffix: constructor(node)}
+    return dict_node({tag_suffix: constructor(node)}, node.start_mark, node.end_mark)
 
 
 def construct_getatt(node):
@@ -169,10 +177,10 @@ def construct_getatt(node):
     Reconstruct !GetAtt into a list
     """
 
-    if isinstance(node.value, (six.text_type, six.string_types)):
-        return node.value.split('.')
+    if isinstance(node.value, (six.string_types)):
+        return list_node(node.value.split('.'), node.start_mark, node.end_mark)
     if isinstance(node.value, list):
-        return [s.value for s in node.value]
+        return list_node([s.value for s in node.value], node.start_mark, node.end_mark)
 
     raise ValueError('Unexpected node type: {}'.format(type(node.value)))
 
@@ -195,5 +203,5 @@ def load(filename):
     """
     Load the given YAML file
     """
-    fp = open(filename)
-    return loads(fp.read(), filename)
+    with open(filename) as fp:
+        return loads(fp.read(), filename)

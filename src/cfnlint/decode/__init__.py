@@ -23,6 +23,7 @@ try:
 except ImportError:
     JSONDecodeError = ValueError
 from yaml.parser import ParserError, ScannerError
+from yaml import YAMLError
 import cfnlint.decode.cfn_yaml
 import cfnlint.decode.cfn_json
 
@@ -41,13 +42,19 @@ def decode(filename, ignore_bad_template):
     except IOError as e:
         if e.errno == 2:
             LOGGER.error('Template file not found: %s', filename)
-            sys.exit(1)
+            matches.append(create_match_file_error(filename, 'Template file not found: %s' % filename))
         elif e.errno == 21:
             LOGGER.error('Template references a directory, not a file: %s', filename)
-            sys.exit(1)
+            matches.append(create_match_file_error(filename, 'Template references a directory, not a file: %s' % filename))
         elif e.errno == 13:
             LOGGER.error('Permission denied when accessing template file: %s', filename)
-            sys.exit(1)
+            matches.append(create_match_file_error(filename, 'Permission denied when accessing template file: %s' % filename))
+
+        if matches:
+            return(None, matches)
+    except UnicodeDecodeError as err:
+        LOGGER.error('Cannot read file contents: %s', filename)
+        matches.append(create_match_file_error(filename, 'Cannot read file contents: %s' % filename))
     except cfnlint.decode.cfn_yaml.CfnParseError as err:
         err.match.Filename = filename
         matches = [err.match]
@@ -57,7 +64,8 @@ def decode(filename, ignore_bad_template):
     except ScannerError as err:
         if err.problem == 'found character \'\\t\' that cannot start any token':
             try:
-                template = json.load(open(filename), cls=cfnlint.decode.cfn_json.CfnJSONDecoder)
+                with open(filename) as fp:
+                    template = json.load(fp, cls=cfnlint.decode.cfn_json.CfnJSONDecoder)
             except cfnlint.decode.cfn_json.JSONDecodeError as json_err:
                 json_err.match.filename = filename
                 matches = [json_err.match]
@@ -70,9 +78,11 @@ def decode(filename, ignore_bad_template):
                 else:
                     LOGGER.error('Template %s is malformed: %s', filename, err.problem)
                     LOGGER.error('Tried to parse %s as JSON but got error: %s', filename, str(json_err))
-                    sys.exit(1)
+                    return(None, [create_match_file_error(filename, 'Tried to parse %s as JSON but got error: %s' % (filename, str(json_err)))])
         else:
             matches = [create_match_yaml_parser_error(err, filename)]
+    except YAMLError as err:
+        matches = [create_match_file_error(filename, err)]
 
     if not isinstance(template, dict) and not matches:
         # Template isn't a dict which means nearly nothing will work
@@ -88,6 +98,13 @@ def create_match_yaml_parser_error(parser_error, filename):
     return cfnlint.Match(
         lineno, colno, lineno, colno + 1, filename,
         cfnlint.ParseError(), message=msg)
+
+
+def create_match_file_error(filename, msg):
+    """Create a Match for a parser error"""
+    return cfnlint.Match(
+        linenumber=1, columnnumber=1, linenumberend=1, columnnumberend=2,
+        filename=filename, rule=cfnlint.ParseError(), message=msg)
 
 
 def create_match_json_parser_error(parser_error, filename):

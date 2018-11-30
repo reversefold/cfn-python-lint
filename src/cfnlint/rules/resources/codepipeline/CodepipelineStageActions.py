@@ -111,6 +111,10 @@ class CodepipelineStageActions(CloudFormationLintRule):
         category = action_type_id.get('Category')
         provider = action_type_id.get('Provider')
 
+        if isinstance(owner, dict) or isinstance(category, dict) or isinstance(provider, dict):
+            self.logger.debug('owner, category, provider need to be strings to validate. Skipping.')
+            return matches
+
         constraints = self.CONSTRAINTS.get(owner, {}).get(category, {}).get(provider, {})
         if not constraints:
             return matches
@@ -175,13 +179,15 @@ class CodepipelineStageActions(CloudFormationLintRule):
         """Check that action type version is valid."""
         matches = []
 
-        if action.get('ActionTypeId').get('Version') != '1':
+        version = action.get('ActionTypeId', {}).get('Version')
+        if isinstance(version, dict):
+            self.logger.debug('Unable to validate version when an object is used.  Skipping')
+        elif version != '1':
             message = 'For all currently supported action types, the only valid version string is "1".'
             matches.append(RuleMatch(
                 path + ['ActionTypeId', 'Version'],
                 message
             ))
-
         return matches
 
     def check_names_unique(self, action, path, action_names):
@@ -199,37 +205,36 @@ class CodepipelineStageActions(CloudFormationLintRule):
 
     def match(self, cfn):
         """Check that stage actions are set up properly."""
-        matches = list()
+        matches = []
 
         resources = cfn.get_resource_properties(['AWS::CodePipeline::Pipeline'])
         for resource in resources:
             path = resource['Path']
             properties = resource['Value']
 
-            stages = properties.get('Stages')
-            if not isinstance(stages, list):
-                self.logger.debug('Stages not list. Should have been caught by generic linting.')
-                return matches
-
-            for sidx, stage in enumerate(stages):
-                stage_path = path + ['Stages', sidx]
-                action_names = set()
-                actions = stage.get('Actions')
-                if not isinstance(actions, list):
-                    self.logger.debug('Actions not list. Should have been caught by generic linting.')
+            s_stages = properties.get_safe('Stages', path)
+            for s_stage_v, s_stage_p in s_stages:
+                if not isinstance(s_stage_v, list):
+                    self.logger.debug('Stages not list. Should have been caught by generic linting.')
                     return matches
 
-                for aidx, action in enumerate(actions):
-                    action_path = stage_path + ['Actions', aidx]
+                for l_i_stage, l_i_path in s_stage_v.items_safe(s_stage_p):
+                    action_names = set()
+                    s_actions = l_i_stage.get_safe('Actions', l_i_path)
+                    for s_action_v, s_action_p in s_actions:
+                        if not isinstance(s_action_v, list):
+                            self.logger.debug('Actions not list. Should have been caught by generic linting.')
+                            return matches
 
-                    try:
-                        matches.extend(self.check_names_unique(action, action_path, action_names))
-                        matches.extend(self.check_version(action, action_path))
-                        matches.extend(self.check_owner(action, action_path))
-                        matches.extend(self.check_artifact_counts(action, 'InputArtifacts', action_path))
-                        matches.extend(self.check_artifact_counts(action, 'OutputArtifacts', action_path))
-                    except AttributeError as err:
-                        self.logger.debug('Got AttributeError. Should have been caught by generic linting. '
-                                          'Ignoring the error here: %s', str(err))
+                        for l_i_a_action, l_i_a_path in s_action_v.items_safe(s_action_p):
+                            try:
+                                matches.extend(self.check_names_unique(l_i_a_action, l_i_a_path, action_names))
+                                matches.extend(self.check_version(l_i_a_action, l_i_a_path))
+                                matches.extend(self.check_owner(l_i_a_action, l_i_a_path))
+                                matches.extend(self.check_artifact_counts(l_i_a_action, 'InputArtifacts', l_i_a_path))
+                                matches.extend(self.check_artifact_counts(l_i_a_action, 'OutputArtifacts', l_i_a_path))
+                            except AttributeError as err:
+                                self.logger.debug('Got AttributeError. Should have been caught by generic linting. '
+                                                  'Ignoring the error here: %s', str(err))
 
         return matches

@@ -4,22 +4,24 @@
 Errors will start with the letter `E`. Errors will result in a hard failure for the template being validated.
 
 ### Warnings
-Warnings start with the letter `W`. Warnings alert you when the template doesnt follow best practices but should still function.  *Example: If you use a parameter for a RDS master password you should have the parameter property NoEcho set to true.*
+Warnings start with the letter `W`. Warnings alert you when the template doesn't follow best practices but should still function.  *Example: If you use a parameter for a RDS master password you should have the parameter property NoEcho set to true.*
 
+### Informational
+Informational results start with the letter `I`. Informational alert you when the template doesn't follow best practices, just like the Warnings, but in a non-blocking way. The Informational level is disabled by default and has to be enabled explicitly using `-c I` or `--include-checks I`.
 
 ## Categories
 
 | Rule Numbers    | Category |
 | --------------- | ------------- |
-| (E&#124;W)0XXX  | Basic Template Errors. Examples: Not parseable, main sections (Outputs, Resources, etc.)  |
-| (E&#124;W)1XXX  | Functions (Ref, GetAtt, etc.)  |
-| (E&#124;W)2XXX  | Parameters |
-| (E&#124;W)3XXX  | Resources |
-| (E&#124;W)4XXX  | Metadata |
-| (E&#124;W)6xxx  | Outputs |
-| (E&#124;W)7xxx  | Mappings |
-| (E&#124;W)8xxx  | Conditions |
-| (E&#124;W)9xxx  | Reserved for users rules |
+| (E&#124;W&#124;I)0XXX  | Basic Template Errors. Examples: Not parseable, main sections (Outputs, Resources, etc.)  |
+| (E&#124;W&#124;I)1XXX  | Functions (Ref, GetAtt, etc.)  |
+| (E&#124;W&#124;I)2XXX  | Parameters |
+| (E&#124;W&#124;I)3XXX  | Resources |
+| (E&#124;W&#124;I)4XXX  | Metadata |
+| (E&#124;W&#124;I)6xxx  | Outputs |
+| (E&#124;W&#124;I)7xxx  | Mappings |
+| (E&#124;W&#124;I)8xxx  | Conditions |
+| (E&#124;W&#124;I)9xxx  | Reserved for users rules |
 
 
 *Warning*
@@ -27,7 +29,7 @@ Rule `E3012` is used to check the types for value of a resource property.  A num
 
 
 ## Rules
-The following **93** rules are applied by this linter:
+The following **98** rules are applied by this linter:
 
 | Rule ID  | Title | Description | Source | Tags |
 | -------- | ----- | ----------- | ------ | ---- |
@@ -51,10 +53,10 @@ The following **93** rules are applied by this linter:
 | E1022 <a name="E1022"></a> | Join validation of parameters | Making sure the join function is properly configured | [Source](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-join.html) | `functions`,`join` |
 | E1023 <a name="E1023"></a> | Validation NOT function configuration | Making sure that NOT functions are list | [Source](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-conditions.html#intrinsic-function-reference-conditions-not) | `functions`,`not` |
 | E1024 <a name="E1024"></a> | Cidr validation of parameters | Making sure the function CIDR is a list with valid values | [Source](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-cidr.html) | `functions`,`cidr` |
-| E1025 <a name="E1025"></a> | Check if Conditions exist | Making sure the Conditions used in Fn:If functions exist | [Source](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-conditions.html#intrinsic-function-reference-conditions-if) | `functions`,`if` |
 | E1026 <a name="E1026"></a> | Cannot reference resources in the Conditions block of the template | Check that any Refs in the Conditions block uses no resources | [Source](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-conditions.html#w2ab2c21c28c21c45) | `functions`,`ref` |
 | E1027 <a name="E1027"></a> | Check dynamic references secure strings are in supported locations | Dynamic References Secure Strings are only supported for a small set of resource properties.  Validate that they are being used in the correct location when checking values and Fn::Sub in resource properties. Currently doesn't check outputs, maps, conditions, parameters, and descriptions. | [Source](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/dynamic-references.html) | `functions`,`dynamic reference` |
 | E1028 <a name="E1028"></a> | Check Fn::If structure for validity | Check Fn::If to make sure its valid.  Condition has to be a string. | [Source](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-conditions.html#intrinsic-function-reference-conditions-if) | `functions`,`if` |
+| E1029 <a name="E1029"></a> | Sub is required if a variable is used in a string | If a substitution variable exists in a string but isn't wrapped with the Fn::Sub function the deployment will fail. | [Source](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-sub.html) | `functions`,`sub` |
 | E2001 <a name="E2001"></a> | Parameters have appropriate properties | Making sure the parameters are properly configured | [Source](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/parameters-section-structure.html) | `parameters` |
 | E2002 <a name="E2002"></a> | Parameters have appropriate type | Making sure the parameters have a correct type | [Source](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/best-practices.html#parmtypes) | `parameters` |
 | E2003 <a name="E2003"></a> | Parameters have appropriate names | Check if Parameters are properly named (A-Za-z0-9) | [Source](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/parameters-section-structure.html#parameters-section-structure-requirements) | `parameters` |
@@ -91,7 +93,10 @@ The following **93** rules are applied by this linter:
 | E3011 <a name="E3011"></a> | Resource name limit not exceeded | Check the size of Resource names in the template is less than the upper limit | [Source](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cloudformation-limits.html) | `resources`,`limits` |
 | E3012 <a name="E3012"></a> | Check resource properties values | Checks resource property values with Primitive Types for values that match those types. | [Source](https://github.com/awslabs/cfn-python-lint/blob/master/docs/cfn-resource-specification.md#valueprimitivetype) | `resources` |
 | E3013 <a name="E3013"></a> | CloudFront Aliases | CloudFront aliases should contain valid domain names | [Source](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-cloudfront-distribution-distributionconfig.html#cfn-cloudfront-distribution-distributionconfig-aliases) | `properties`,`cloudfront` |
+| E3016 <a name="E3016"></a> | Check the configuration of a resources UpdatePolicy | Make sure a resources UpdatePolicy is properly configured | [Source](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-attribute-updatepolicy.html) | `resources`,`updatepolicy` |
 | E3020 <a name="E3020"></a> | Validate Route53 RecordSets | Check if all RecordSets are correctly configured | [Source](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/ResourceRecordTypes.html) | `resources`,`route53`,`record_set` |
+| E3021 <a name="E3021"></a> | Check Events Rule Targets are less than or equal to 5 | CloudWatch Events Rule can only support up to 5 targets | [Source](https://docs.aws.amazon.com/AmazonCloudWatch/latest/events/cloudwatch_limits_cwe.html) | `resources`,`events` |
+| E3022 <a name="E3022"></a> | Resource SubnetRouteTableAssociation Properties | Validate there is only one SubnetRouteTableAssociation per subnet | [Source](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet-route-table-assoc.html) | `resources`,`subnet`,`route table` |
 | E4001 <a name="E4001"></a> | Metadata Interface have appropriate properties | Metadata Interface properties are properly configured | [Source](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cloudformation-interface.html) | `metadata` |
 | E6001 <a name="E6001"></a> | Outputs have appropriate properties | Making sure the outputs are properly configured | [Source](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/outputs-section-structure.html) | `outputs` |
 | E6002 <a name="E6002"></a> | Outputs have required properties | Making sure the outputs have required properties | [Source](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/outputs-section-structure.html) | `outputs` |
@@ -108,6 +113,8 @@ The following **93** rules are applied by this linter:
 | E7011 <a name="E7011"></a> | Mapping name limit not exceeded | Check the size of Mapping names in the template is less than the upper limit | [Source](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cloudformation-limits.html) | `mappings`,`limits` |
 | E7012 <a name="E7012"></a> | Mapping attribute limit not exceeded | Check if the amount of Mapping attributes in the template is less than the upper limit | [Source](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cloudformation-limits.html) | `mappings`,`limits` |
 | E8001 <a name="E8001"></a> | Conditions have appropriate properties | Check if Conditions are properly configured | [Source](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/conditions-section-structure.html) | `conditions` |
+| E8002 <a name="E8002"></a> | Check if the referenced Conditions are defined | Making sure the used conditions are actually defined in the Conditions section | [Source](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/conditions-section-structure.html) | `conditions` |
+| I3011 <a name="I3011"></a> | Check DynamoDB tables have a set DeletionPolicy | The default action when removing a DynamoDB Table is to delete it. This check requires you to specifically set a DeletionPolicy and you know the risks | [Source](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-attribute-deletionpolicy.html) | `resources`,`dynamodb` |
 | W1019 <a name="W1019"></a> | Sub validation of parameters | Validate that Fn::Sub Parameters are used | [Source](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-sub.html) | `functions`,`sub` |
 | W1020 <a name="W1020"></a> | Sub isn't needed if it doesn't have a variable defined | Checks sub strings to see if a variable is defined. | [Source](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-sub.html) | `functions`,`sub` |
 | W2001 <a name="W2001"></a> | Check if Parameters are Used | Making sure the parameters defined are used | [Source](https://github.com/awslabs/cfn-python-lint) | `parameters` |
